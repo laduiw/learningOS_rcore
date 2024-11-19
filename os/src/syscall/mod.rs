@@ -26,8 +26,19 @@ mod process;
 
 use fs::*;
 use process::*;
+
+use crate::task::change_syscall_time;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    match syscall_id {
+        SYSCALL_WRITE | SYSCALL_EXIT | SYSCALL_YIELD | SYSCALL_GET_TIME | SYSCALL_TASK_INFO =>
+        {
+            //if syscall_id == SYSCALL_WRITE || syscall_id == SYSCALL_TASK_INFO {println!("in test syscall id is {}", syscall_id);}
+            change_syscall_time(syscall_id)
+        },
+        _ => panic!("Unsupported syscall_id: {}", syscall_id),
+    }
+
     match syscall_id {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),

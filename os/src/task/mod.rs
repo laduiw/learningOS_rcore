@@ -15,8 +15,10 @@ mod switch;
 mod task;
 
 use crate::config::MAX_APP_NUM;
+use crate::config::MAX_SYSCALL_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -54,10 +56,14 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            task_time: 0,
+            task_syscall: [0; MAX_SYSCALL_NUM],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
             task.task_status = TaskStatus::Ready;
+            task.task_time = get_time_ms() as usize;
+            task.task_syscall = [0; MAX_SYSCALL_NUM];
         }
         TaskManager {
             num_app,
@@ -135,6 +141,24 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    fn change_syscall_time(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_syscall[syscall_id] += 1 ;
+    }
+
+    fn get_running_task_time(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_time
+    }
+
+    fn get_running_task_syscall(&self) -> [u32; MAX_SYSCALL_NUM] {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_syscall
+    }
 }
 
 /// Run the first task in task list.
@@ -168,4 +192,19 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// get current running task time
+pub fn get_running_task_time() -> usize {
+    TASK_MANAGER.get_running_task_time()
+}
+
+/// get current running task syscall
+pub fn get_running_task_syscall() -> [u32; MAX_SYSCALL_NUM] {
+    TASK_MANAGER.get_running_task_syscall()
+}
+
+/// chage syscall_id times plus 1
+pub fn change_syscall_time(syscall_id: usize) {
+    TASK_MANAGER.change_syscall_time(syscall_id);
 }
