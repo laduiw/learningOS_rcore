@@ -14,7 +14,9 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::config::MAX_SYSCALL_NUM;
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{ MapPermission, VirtPageNum};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -153,6 +155,31 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    fn change_syscall_time(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_syscall[syscall_id] += 1 ;
+    }
+
+    fn get_running_task_time(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_time
+    }
+
+    fn get_running_task_syscall(&self) -> [u32; MAX_SYSCALL_NUM] {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_syscall
+    }
+
+    /*fn unmap_one(&self,vpn:VirtPageNum) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].memory_set.page_table.unmap(vpn);
+    }*/
+
 }
 
 /// Run the first task in task list.
@@ -201,4 +228,60 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// get current running task time
+pub fn get_running_task_time() -> usize {
+    TASK_MANAGER.get_running_task_time()
+}
+
+/// get current running task syscall
+pub fn get_running_task_syscall() -> [u32; MAX_SYSCALL_NUM] {
+    TASK_MANAGER.get_running_task_syscall()
+}
+
+/// chage syscall_id times plus 1
+pub fn change_syscall_time(syscall_id: usize) {
+    TASK_MANAGER.change_syscall_time(syscall_id);
+}
+
+/// 检查当前运行的任务的某一个虚拟页是否被映射
+pub fn check(vpn:VirtPageNum) -> bool {
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    if let Some(pte) = inner.tasks[current].memory_set.translate(vpn) {
+        if pte.is_valid() {
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
+}
+
+/// map a area from start_vpn to end_vpn
+pub fn map_all(start_vpn:VirtPageNum,end_vpn:VirtPageNum,port:usize) {
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    inner.tasks[current].memory_set.insert_framed_area(start_vpn.into(), end_vpn.into(),  MapPermission::from_bits_truncate(port as u8));
+}
+
+/// unmap a area from start_vpn to end_vpn
+pub fn unmap_all(start_vpn:VirtPageNum,end_vpn:VirtPageNum) {
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    // for 循环不能包括末尾
+    for vpn in  start_vpn.0 .. end_vpn.0 {
+        inner.tasks[current].memory_set.get_page_table().unmap(VirtPageNum(vpn));
+    }
+
+    //inner.tasks[current].memory_set.insert_framed_area(start_vpn.into(), end_vpn.into(),  MapPermission::from_bits_truncate(port as u8));
+}
+
+/// get current task
+pub fn get_current_task() -> usize{
+    let inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    current
 }
