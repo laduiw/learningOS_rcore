@@ -118,40 +118,128 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
+    //trace!(
+    //    "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
+    //    current_task().unwrap().pid.0
+    //);
+    let physical_vec = translated_byte_buffer(
+        current_user_token(),
+        _ts as *const u8, core::mem::size_of::<TimeVal>()
     );
-    -1
+    let us = get_time_us();
+    let ref time_val = TimeVal {
+            sec: us / 1_000_000,
+            usec: us % 1_000_000,
+    };
+    let time_write = time_val as *const TimeVal;
+    for (page_id, phy) in physical_vec.into_iter().enumerate() {
+        let ulen = phy.len();
+        unsafe {
+            phy.copy_from_slice(core::slice::from_raw_parts(
+                // 这里按照byte的方式写入每个物理地址
+                time_write.wrapping_byte_add(page_id * ulen) as *const u8,
+                ulen)
+            );
+        }
+    }
+    0
+}
+
+
+/// Get the current task's task_time
+pub fn get_running_task_time() -> usize {
+    let task = current_task().unwrap();
+    let inner = task.inner_exclusive_access();
+    inner.task_time
+}
+
+/// Get the current task's sys_call times
+pub fn get_running_task_syscall() -> [u32;MAX_SYSCALL_NUM] {
+    let task = current_task().unwrap();
+    let inner = task.inner_exclusive_access();
+    inner.task_syscall 
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
+    //trace!(
+    //    "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
+    //    current_task().unwrap().pid.0
+    //);
+    //-1
+    let time_bef = get_running_task_time();
+    //println!("timebef is {},now is {}",time_bef,get_time_ms() as usize);
+    //println!("timebef is {}",time_bef);
+    let ref task_now = TaskInfo{
+        status: TaskStatus::Running,
+        time :  get_time_ms() as usize - time_bef,
+        syscall_times: get_running_task_syscall()
+    };
+    let physical_vec = translated_byte_buffer(
+        current_user_token(),
+        _ti as *const u8, core::mem::size_of::<TaskInfo>()
     );
-    -1
+    let task_write = task_now as *const TaskInfo;
+    for (page_id, phy) in physical_vec.into_iter().enumerate() {
+        let ulen = phy.len();
+        unsafe {
+            phy.copy_from_slice(core::slice::from_raw_parts(
+                task_write.wrapping_byte_add(page_id * ulen) as *const u8,
+                ulen)
+            );
+        }
+    }
+    0
 }
 
 /// YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+    //trace!(
+    //    "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
+    //    current_task().unwrap().pid.0
+    //);
+    if (_port & !0x7!=0) ||  (_port & 0x7 == 0) || (_start & (PAGE_SIZE - 1)!=0){
+        return -1;
+    }
+    //let page_table = PageTable::from_token(current_user_token());
+    let mut start_vpn=VirtAddr::from(_start).floor();
+    let end_vpn = VirtAddr::from(_start + _len).ceil();
+    //println!("task is {}, mmap st_vpn is {}, end_vpn is {}", get_current_task(),start_vpn.0,end_vpn.0);
+
+    while start_vpn.0<end_vpn.0
+    {
+        //let inner = TASK_MANAGER.inner.exclusive_access();
+        if check(start_vpn) {return -1;}
+        start_vpn.0 +=1;
+    }
+    start_vpn=VirtAddr::from(_start).floor();
+    map_all(start_vpn,end_vpn,_port<<1 | (1<<4));
+    0
 }
 
 /// YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+    //trace!(
+    //    "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
+    //    current_task().unwrap().pid.0
+    //);
+    //-1
+    if _start & (PAGE_SIZE-1)!=0 {return -1;}
+    //trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
+    let mut start_vpn=VirtAddr::from(_start).floor();
+    let end_vpn = VirtAddr::from(_start + _len).ceil();
+    //println!("task is {}, unmap st_vpn is {}, end_vpn is {}", get_current_task(),start_vpn.0,end_vpn.0);
+    while start_vpn.0<=end_vpn.0
+    {
+        //let inner = TASK_MANAGER.inner.exclusive_access();
+        if !check(start_vpn) {return -1;}
+        start_vpn.0 +=1;
+    }
+    start_vpn=VirtAddr::from(_start).floor();
+    unmap_all(start_vpn,end_vpn);
+    0
 }
 
 /// change data segment size

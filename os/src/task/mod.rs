@@ -23,6 +23,7 @@ mod switch;
 mod task;
 
 use crate::fs::{open_file, OpenFlags};
+use crate::{loader::get_app_data_by_name, mm::{MapPermission, VirtPageNum}};
 use alloc::sync::Arc;
 pub use context::TaskContext;
 use lazy_static::*;
@@ -119,4 +120,45 @@ lazy_static! {
 ///Add init process to the manager
 pub fn add_initproc() {
     add_task(INITPROC.clone());
+}
+
+/// update syscall_time
+pub fn change_syscall_times(syscall_id: usize) {
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.task_syscall[syscall_id] += 1;
+    //if syscall_id==410 {println!("info time is {}",inner.task_syscall[syscall_id]);}
+}
+
+/// check if a vpn is valid
+pub fn check(vpn:VirtPageNum) -> bool {
+    let task = current_task().unwrap();
+    let inner = task.inner_exclusive_access();
+    if let Some(pte) = inner.memory_set.translate(vpn) {
+        if pte.is_valid() {
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
+}
+
+/// map a area from start_vpn to end_vpn
+pub fn map_all(start_vpn:VirtPageNum,end_vpn:VirtPageNum,port:usize) {
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.memory_set.insert_framed_area(start_vpn.into(), end_vpn.into(),  MapPermission::from_bits_truncate(port as u8));
+}
+
+/// unmap a area from start_vpn to end_vpn
+pub fn unmap_all(start_vpn:VirtPageNum,end_vpn:VirtPageNum) {
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    // for 循环不能包括末尾
+    for vpn in  start_vpn.0 .. end_vpn.0 {
+        inner.memory_set.get_page_table().unmap(VirtPageNum(vpn));
+    }
+    //inner.tasks[current].memory_set.insert_framed_area(start_vpn.into(), end_vpn.into(),  MapPermission::from_bits_truncate(port as u8));
 }

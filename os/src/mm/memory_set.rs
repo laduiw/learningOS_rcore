@@ -11,6 +11,7 @@ use alloc::vec::Vec;
 use core::arch::asm;
 use lazy_static::*;
 use riscv::register::satp;
+use core::borrow::BorrowMut;
 
 extern "C" {
     fn stext();
@@ -43,6 +44,11 @@ pub struct MemorySet {
 }
 
 impl MemorySet {
+    
+    /// get page table mut
+    pub fn get_page_table(&mut self) -> &mut PageTable {
+        self.page_table.borrow_mut()
+    }
     /// Create a new empty `MemorySet`.
     pub fn new_bare() -> Self {
         Self {
