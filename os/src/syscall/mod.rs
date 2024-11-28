@@ -45,9 +45,18 @@ mod process;
 
 use fs::*;
 use process::*;
+
+use crate::task::change_syscall_times;
+
+//use crate::task::current_task;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
-    match syscall_id {
+
+    change_syscall_times(syscall_id);
+    //let syscall_list = get_running_task_syscall();
+    //if syscall_id == SYSCALL_TASK_INFO {println!("pid is {}, add after, syscall id is {}, time is {}",current_task().unwrap().pid.0, syscall_id, syscall_list[syscall_id]);}
+
+    let pd = match syscall_id {
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
@@ -64,5 +73,9 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_SPAWN => sys_spawn(args[0] as *const u8),
         SYSCALL_SET_PRIORITY => sys_set_priority(args[0] as isize),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
-    }
+    };
+    
+    //syscall_list[syscall_id] +=1 ;
+    //if syscall_id == SYSCALL_TASK_INFO {println!("syscall id is {}, time is {}",syscall_id, inner.task_syscall[syscall_id]);}
+    pd
 }
