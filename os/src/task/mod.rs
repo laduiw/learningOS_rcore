@@ -156,3 +156,14 @@ pub fn unmap_all(start_vpn:VirtPageNum,end_vpn:VirtPageNum) {
     }
     //inner.tasks[current].memory_set.insert_framed_area(start_vpn.into(), end_vpn.into(),  MapPermission::from_bits_truncate(port as u8));
 }
+
+/// spawn a new profess from elf_data
+pub fn spawn(elf_data: &[u8]) -> Arc<TaskControlBlock>
+{
+    let task = current_task().unwrap();
+    let mut parent_inner = task.inner_exclusive_access();
+    let new_task = Arc::new(TaskControlBlock::new(elf_data));
+    //let new_pid = new_task.pid.0;
+    parent_inner.children.push(new_task.clone());
+    new_task
+}
