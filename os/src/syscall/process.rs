@@ -188,22 +188,6 @@ pub fn sys_set_priority(prio: isize) -> isize {
         drop(inner);
         return prio;
     }
-}
-
-// YOUR JOB: Set task priority.
-pub fn sys_set_priority(prio: isize) -> isize {
-    //trace!(
-    //    "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
-    //    current_task().unwrap().pid.0
-    //);
-    //-1
-    if prio>=2 {
-        let task = current_task().unwrap();
-        let mut inner = task.inner_exclusive_access();
-        inner.priority = prio as u64;
-        drop(inner);
-        return prio;
-    }
     else {
         return -1;
     };
