@@ -23,7 +23,7 @@ pub struct TaskControlBlock {
     pub kernel_stack: KernelStack,
 
     /// Mutable
-    inner: UPSafeCell<TaskControlBlockInner>,
+    pub inner: UPSafeCell<TaskControlBlockInner>,
 }
 
 impl TaskControlBlock {
@@ -71,6 +71,18 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// First time to be called
+    pub task_time: usize, 
+
+    /// syscall times
+    pub task_syscall: [u32; MAX_SYSCALL_NUM],
+
+    /// priority number 
+    pub priority: u64,
+
+    /// priority stride number
+    pub stride: u64,
 }
 
 impl TaskControlBlockInner {
@@ -80,7 +92,7 @@ impl TaskControlBlockInner {
     pub fn get_user_token(&self) -> usize {
         self.memory_set.token()
     }
-    fn get_status(&self) -> TaskStatus {
+    pub fn get_status(&self) -> TaskStatus {
         self.task_status
     }
     pub fn is_zombie(&self) -> bool {
@@ -135,6 +147,10 @@ impl TaskControlBlock {
                     ],
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    task_time: get_time_ms() as usize,
+                    task_syscall: [0; MAX_SYSCALL_NUM],
+                    priority: 16,
+                    stride: 0,
                 })
             },
         };
@@ -216,6 +232,10 @@ impl TaskControlBlock {
                     fd_table: new_fd_table,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    task_time: get_time_ms() as usize,
+                    task_syscall: [0; MAX_SYSCALL_NUM],
+                    priority: 16,
+                    stride: 0,
                 })
             },
         });
