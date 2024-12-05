@@ -2,10 +2,7 @@
 use super::TaskContext;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
 use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
-<<<<<<< HEAD
 use crate::fs::{File, Stdin, Stdout};
-=======
->>>>>>> 1e51b2f... lab3 prework in lab2 finish
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::timer::get_time_ms;
@@ -81,15 +78,12 @@ pub struct TaskControlBlockInner {
 
     /// syscall times
     pub task_syscall: [u32; MAX_SYSCALL_NUM],
-<<<<<<< HEAD
 
     /// priority number 
     pub priority: u64,
 
     /// priority stride number
     pub stride: u64,
-=======
->>>>>>> 1e51b2f... lab3 prework in lab2 finish
 }
 
 impl TaskControlBlockInner {
@@ -156,11 +150,8 @@ impl TaskControlBlock {
                     program_brk: user_sp,
                     task_time: get_time_ms() as usize,
                     task_syscall: [0; MAX_SYSCALL_NUM],
-<<<<<<< HEAD
                     priority: 16,
                     stride: 0,
-=======
->>>>>>> 1e51b2f... lab3 prework in lab2 finish
                 })
             },
         };
@@ -244,11 +235,8 @@ impl TaskControlBlock {
                     program_brk: parent_inner.program_brk,
                     task_time: get_time_ms() as usize,
                     task_syscall: [0; MAX_SYSCALL_NUM],
-<<<<<<< HEAD
                     priority: 16,
                     stride: 0,
-=======
->>>>>>> 1e51b2f... lab3 prework in lab2 finish
                 })
             },
         });
