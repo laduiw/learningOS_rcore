@@ -7,7 +7,7 @@ use crate::{
     fs::{open_file, OpenFlags},
     mm::{translated_byte_buffer, translated_refmut, translated_str, VirtAddr},
     task::{
-        add_task, check, current_task, current_user_token, exit_current_and_run_next, map_all, suspend_current_and_run_next, unmap_all, TaskStatus
+        add_task, check, current_task, current_user_token, exit_current_and_run_next, map_all, spawn, suspend_current_and_run_next, unmap_all, TaskStatus
     }, timer::{get_time_ms, get_time_us},
 };
 
@@ -261,8 +261,10 @@ pub fn sys_spawn(_path: *const u8) -> isize {
     let token = current_user_token();
     let path = translated_str(token, _path);
     let current_task = current_task().unwrap();
-    if let Some(data) = get_app_data_by_name(path.as_str()) {
-        let new_task = spawn(data);
+
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = app_inode.read_all();
+        let new_task = spawn(all_data.as_slice());
         let mut inner = new_task.inner_exclusive_access();
         inner.parent = Some(Arc::downgrade(&current_task));
         drop(inner);
