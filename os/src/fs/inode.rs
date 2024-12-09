@@ -8,7 +8,7 @@ use super::File;
 use crate::drivers::BLOCK_DEVICE;
 use crate::mm::UserBuffer;
 use crate::sync::UPSafeCell;
-use alloc::sync::Arc;
+use alloc::{string::String, sync::Arc};
 use alloc::vec::Vec;
 use bitflags::*;
 use easy_fs::{EasyFileSystem, Inode};
@@ -100,6 +100,42 @@ impl OpenFlags {
     }
 }
 
+/// find a inode
+pub fn find_inode(name: &str) -> Option<Arc<Inode>> {
+    ROOT_INODE.find(name)
+}
+
+/// link a file 问题是我返回了一个OSInode，但是我里面的readable这些东西应该是和old name相同的，ROOT Inode也是Inode，根本没有readable的信息
+pub fn link_file(old_name: &str, new_name: &str) -> Option<Arc<OSInode>>
+{
+    //if let Some(inode) = ROOT_INODE.find(old_name) {
+        //let (readable, writable) = flags.read_write();
+    ROOT_INODE.link(old_name,new_name)
+        .map(|inode| Arc::new(OSInode::new(true, true, inode)))
+    //}
+    //else {
+    //    None
+    //}
+}
+
+/// unlink a file 
+pub fn unlink_file(name: &str) -> (isize,String)
+{
+    //if let Some(inode) = ROOT_INODE.find(old_name) {
+        //let (readable, writable) = flags.read_write();
+    ROOT_INODE.unlink(name)
+    //}
+    //else {
+    //    None
+    //}
+}
+
+
+/// get file nlink times
+pub fn get_file_nlink(block_id:usize,offset: usize) -> u32 {
+    ROOT_INODE.get_file_nlink(block_id,offset)
+}
+
 /// Open a file
 pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
     let (readable, writable) = flags.read_write();
@@ -154,5 +190,19 @@ impl File for OSInode {
             total_write_size += write_size;
         }
         total_write_size
+    }
+    fn get_file_inode(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        inner.inode.block_id
+    }
+    fn get_file_type(&self) -> super::StatMode {
+        let inner = self.inner.exclusive_access();
+        let pd = inner.inode.get_disk_inode_type();
+        if pd==true {return super::StatMode::DIR;}
+            else {return super::StatMode::FILE;}
+    }
+    fn get_file_inf(&self) -> (usize,usize) {
+        let inner = self.inner.exclusive_access();
+        inner.inode.get_inode_inf()
     }
 }

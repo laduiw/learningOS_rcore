@@ -427,6 +427,11 @@ impl DirEntry {
         let len = (0usize..).find(|i| self.name[*i] == 0).unwrap();
         core::str::from_utf8(&self.name[..len]).unwrap()
     }
+    /// Get clone name of the entry
+    pub fn name_clone(&self) -> &str {
+        let len = (0usize..).find(|i| self.name[*i] == 0).unwrap();
+        core::str::from_utf8(&self.name[..len]).unwrap()
+    }
     /// Get inode number of the entry
     pub fn inode_id(&self) -> u32 {
         self.inode_id
