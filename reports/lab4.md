@@ -1,0 +1,13 @@
+### CH6 文件系统
+
+文件系统涉及的代码修改较多，主要实现stat，linkat和unlink三条系统调用。
+
+首先是stat，需要返回inode number，file type和nlink数量三个特征。这个系统调用的输入是fd，我们根据fd可以获得一个File trait，但是目前的File trait只有读写，我们需要增加trait数量来获取这些信息。所以我们增加了三条trait，get_file_inode、get_file_type和get_file_inf，这三个函数分别返回inode number，file种类，以及file的block id和offset（这个本来就是inode的特征，但是由于File封装，只有写个函数把特征提出来）。首先根据fd可以获得OSinode，然后对OSinode实现新的三个函数，inode id这个值存在DirtEntry这里，要想取出来需要从根目录找比较麻烦。所以可以根据所在的block id和offset推算出inode id，file type这里因为Diskinode上存了，所以直接根据inode读这个属性即可。而获取block id和offset也比较简单，直接读OSinode里面封装的Inode即可。这样便可以简单地获得inode number和file type这两个特征。
+
+而对于nlink数量的特征，需要在ROOT_INODE这个全局的Inode实现，一个name是否指向同一个文件，由block id和offset唯一确定（也就是是不是指向同一个DiskInode），所以我们先获得当前文件的block id和offset，遍历ROOT_INODE，看是否有文件这两项相同，统计数量，得到nlink数量。
+
+Linkat系统调用也是在ROOT_INODE中实现，模仿了新建文件的代码，先找到旧的inode，然后在ROOT_INODE中新增一个DirtEntry，它的名字是新文件，但是inode id是旧id，这是和新建文件唯一的区别。
+
+unlink的实现也在ROOT_INODE中，首先找到这个DirtEntry（根据名字），然后由于我们删除后会留下一个空洞，这是我们不希望的，所以我们选取当前块中最后一个Entry和当前的Entry交换，然后减少size，这样最后一个Entry就不会被访问到了，保证了结果的正确性。
+
+遇到的问题包括：link文件的readable和writeable的特征应该保持和旧文件一样，但是目前没有写找这两个特征的函数。在inode.rs中实现的函数不能被外面调用，因为inode是私有的，需要额外声明哪些函数可以被外围调用。ROOT_INODE这个全局变量不能被外围调用，所以关于它的函数需要在inode.rs中进行封装，再公开声明，才能被外部调用。

@@ -1,0 +1,11 @@
+### CH5 user_shell
+
+这里要求可以成功完成之前的用例。首先本章代码对于TaskControlBlock进行了修改，里面申请了inner的内容，作为可变的空间，所以把task_time和syscall_time放进inner里面。其余的修改类似，本来针对TaskManager的改变，现在针对Processor结构进行改变，因为正在运行的TCB在Processor中，直接按照原来的方式修改即可。值得注意的是Arc指针的引入，需要先unwrap，然后再exclussive_inner访问，不然可能报错或修改不到。另外需要注意因为进程都是fork出来的，新进程的time和syscall次数要重置，而不是复制parent的。
+
+本次实验的主体任务为实现spawn和实现基于priority的调度。spawn实现较为简单，调用new方法（本来是为了建立initproc）的，我们将它的parent指向当前的task即可，然后结合exec读取elf文件导入，最后把任务add进入task队列即可。
+
+对于priority的调度，最核心的是fetch函数，也就是选择一个应用把它从ready队列取出来，因为我们根据stride选最小的，那么就for循环一遍，从ready态的TCB中找到index，然后修改它的stride，最后取出即可。
+
+遇到的问题：fetch函数如果找不到Ready态的进程怎么办，如果找不到返回None会导致死锁，所以现在的处理办法是把0号pop出去。
+
+另外最大值的选取问题，如果BIG-STRIDE真的选u64的最大值，可能导致溢出问题，也会死锁。另外为了选取最小值，初值要选取为真最大值，如果是和BIG-STRIDE相关的值可能出错，导致算法不能按priority调度。所以我们选择BIG-STRIDE为32位最大值，真最大值设置为64位最大值，可以保证相对关系。
